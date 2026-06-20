@@ -1,47 +1,63 @@
 import discord
-from discord.ext.commands import bot
-from discord import game
 from discord.ext import commands
 import asyncio
-import platform
 import colorsys
 import random
-import time
+import os
 
-client = commands.Bot(command_prefix = '-', case_insensitive=True)
-Client = discord.client
-Clientdiscord = discord.Client()
+# Initialize the bot client (v1.7.3 syntax)
+client = commands.Bot(command_prefix='-', case_insensitive=True)
 
 @client.event
 async def on_ready():
-    print('Logged in as '+client.user.name+' (ID:'+client.user.id+') | Connected to '+str(len(client.servers))+' servers | Connected to '+str(len(set(client.get_all_members())))+' users')
-    print('--------')
+    print(f'Logged in as {client.user.name} (ID: {client.user.id})')
     print('--------')
     print('CREATED AND HOSTED BY NUZZ')
 
-@client.command(pass_context = True)
+@client.command()
 @commands.has_permissions(kick_members=True)     
 async def userinfo(ctx, user: discord.Member):
     r, g, b = tuple(int(x * 255) for x in colorsys.hsv_to_rgb(random.random(), 1, 1))
-    embed = discord.Embed(title="{}'s info".format(user.name), description="Here's what I could find.", color = discord.Color((r << 16) + (g << 8) + b))
+    embed = discord.Embed(
+        title=f"{user.name}'s info", 
+        description="Here's what I could find.", 
+        color=discord.Color((r << 16) + (g << 8) + b))
     embed.add_field(name="Name", value=user.name, inline=True)
     embed.add_field(name="ID", value=user.id, inline=True)
-    embed.add_field(name="Status", value=user.status, inline=True)
-    embed.add_field(name="Highest role", value=user.top_role)
-    embed.add_field(name="Joined", value=user.joined_at)
-    embed.set_thumbnail(url=user.avatar_url)
-    await client.say(embed=embed)
+    embed.add_field(name="Status", value=str(user.status), inline=True)
+    embed.add_field(name="Highest role", value=user.top_role, inline=True)
+    embed.add_field(name="Joined", value=str(user.joined_at), inline=True)
     
+    if user.avatar_url:
+        embed.set_thumbnail(url=user.avatar_url)
+        
+    await ctx.send(embed=embed)
+    
+@client.command()
 @commands.has_permissions(administrator=True)
-@client.command(pass_context = True)
 async def send(ctx, *, content: str):
-        for member in ctx.message.server.members:
-            try:
-                await client.send_message(member, content)
-                await client.say("DM Sent To : {} :white_check_mark:  ".format(member))
-            except:
-                print("can't")
-                await client.say("DM can't Sent To : {} :x: ".format(member))
+    await ctx.send("Starting Mass DM process... Please wait.")
 
+    for member in ctx.guild.members:
+        # Skip bots and yourself
+        if member.bot or member == client.user:
+            continue
+            
+        try:
+            # Send the DM directly to the member
+            await member.send(content)
+            await ctx.send(f"✅ DM Sent To : {member.name}")
+        except Exception:
+            await ctx.send(f"❌ DM Can't Send To : {member.name}")
+            
+        # ⏱️ THE 5-SECOND TIMER TO PREVENT DISCORD RATE LIMITS
+        await asyncio.sleep(5)
 
-client.run(os.getenv("DISCORD_TOKEN"))           
+    await ctx.send("📢 Mass DM process finished!")
+
+# Run the bot (Heroku uses this environment variable)
+token = os.getenv("DISCORD_TOKEN")
+if token:
+    client.run(token)
+else:
+    print("Error: DISCORD_TOKEN environment variable not found.")
